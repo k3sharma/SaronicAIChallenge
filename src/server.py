@@ -8,8 +8,11 @@ Each tool call now passes through a gateway check first, enforced within the MCP
 import os
 import sys
 from mcp.server.fastmcp import FastMCP      # FastMCP is a framework used for building MCP applications
+import audit_log
 
 mcp = FastMCP("SaronicChallengeGateway")    # Instantiate an MCP server called SaronicChallengeGateway
+
+audit_log.init_db()         # Initialize the log table at the start
 
 # Example database with key value pairs
 FAKE_CUSTOMER_DATABASE = {
@@ -35,10 +38,13 @@ def is_allowed(identity: str, tool_name: str) -> bool:
     return tool_name in allowed_for_this_identity
  
 # Simple logging function 
-def log_access_attempt(identity: str, tool_name: str, allowed: bool) -> None:
+def log_access_attempt(identity: str, tool_name: str, tool_args: dict, allowed: bool, detail: str="") -> None:
     verdict = "ALLOWED" if allowed else "DENIED"
     print(f"[GATEWAY] {verdict}: identity='{identity}' tool='{tool_name}'", file=sys.stderr)
- 
+    
+    # Now, persist a row to the audit database
+    # Print will show the event once, but this version of the same event will survive
+    audit_log.record_access(identity, tool_name, tool_args, allowed, detail)
 
 # Use a decorator so that FastMCP registers it as a tool, thus, clients can discover get_customer and call it
 @mcp.tool()
@@ -46,8 +52,13 @@ def get_customer(customer_id: str) -> dict:
     # Look up a customer's account information (name, plan tier, and account status) using their unique customer ID
     
     allowed = is_allowed(CURRENT_IDENTITY, "get_customer")      # This is where the gateway check occurs
-    log_access_attempt(CURRENT_IDENTITY, "get_customer", allowed)
-    
+    log_access_attempt(
+            CURRENT_IDENTITY,
+            "get_customer",
+            {"customer_id": customer_id},       # Which customer was looked up
+            allowed,
+            detail="" if allowed else "not in ALLOWED_TOOLS for this identity",     # For humans
+        )    
     # If the check fails, immediately return an access denied message
     if not allowed:
         return {

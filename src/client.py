@@ -17,8 +17,6 @@ load_dotenv()
 claude = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
 
-
-
 # This function is used to convert MCP tool descriptions to Claude tool descriptions, due to formatting reasons
 def mcp_tools_to_claude_format(mcp_tools) -> list[dict]:
     claude_tools = []
@@ -29,6 +27,16 @@ def mcp_tools_to_claude_format(mcp_tools) -> list[dict]:
             "input_schema": tool.inputSchema,
         })
     return claude_tools
+
+# Loop through content blocks and pick out the one that actually has text
+# Using content[0].text blindly assumes the first block is always the text answer, 
+# which breaks the moment any non-text block shows up first
+def extract_text(content_blocks) -> str:
+    for block in content_blocks:
+        if block.type == "text":
+            return block.text
+    return "[No text block found in response]"
+ 
 
 # Now using a reusable function that doesn't hardcode a single run. It also launches a fresh server subprocess as the given identity, asks it one question, and prints the result 
 # Wrapping this in a function is what lets us call the program twice with different identities
@@ -108,9 +116,9 @@ async def run_as(identity: str, question: str):
                     messages=messages,
                 )
                 # Print
-                print(f"\nFinal answer:\n{final_response.content[0].text}")
+                print(f"\nFinal answer:\n{extract_text(final_response.content)}")
             else:
-                print(f"\nFinal answer:\n{response.content[0].text}")
+                print(f"\nFinal answer:\n{extract_text(response.content)}")
     
     
 
