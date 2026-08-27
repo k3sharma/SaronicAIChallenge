@@ -17,11 +17,7 @@ load_dotenv()
 claude = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
 
-# Describes that the client is telling the library to launch the MCP server
-server_params = StdioServerParameters(
-    command="python",
-    args=["src/server.py"],
-)
+
 
 # This function is used to convert MCP tool descriptions to Claude tool descriptions, due to formatting reasons
 def mcp_tools_to_claude_format(mcp_tools) -> list[dict]:
@@ -34,8 +30,26 @@ def mcp_tools_to_claude_format(mcp_tools) -> list[dict]:
         })
     return claude_tools
 
-# Use an async function when communicating with servers
-async def main():
+# Now using a reusable function that doesn't hardcode a single run. It also launches a fresh server subprocess as the given identity, asks it one question, and prints the result 
+# Wrapping this in a function is what lets us call the program twice with different identities
+async def run_as(identity: str, question: str):
+    print(f"\n{'=' * 70}")
+    print(f"Connecting as identity: '{identity}'")
+    print('=' * 70)
+ 
+    # Copy the current environment because we do not want to replace the entire environment throughout the process
+    # If identity = "guest", then AGENT_IDENTITY = "guest". If identity = "customer", then AGENT_IDENTITY = "customer"
+    # Thus, the environment contains information about who the client claims to be
+    env = os.environ.copy()
+    env["AGENT_IDENTITY"] = identity
+    
+    # Describes that the client is telling the library to launch the MCP server
+    server_params = StdioServerParameters(
+        command="python",
+        args=["src/server.py"],
+        env=env,    # Pass the environment to the server
+    )
+    
     # Launches the server subprocess (python src/server.py) and returns 2 communication pipes (stdin/stdout)
     async with stdio_client(server_params) as (read_stream, write_stream):  
         async with ClientSession(read_stream, write_stream) as session:     # Create an MCP handshake
@@ -44,13 +58,11 @@ async def main():
             tools_response = await session.list_tools()            # Ask the server what tools it has
             claude_tools = mcp_tools_to_claude_format(tools_response.tools)     # Converts MCP format to Claude format
 
-            print(f"Discovered tools from server: {[t['name'] for t in claude_tools]}")     # Print the tool names
-
             # Claude conversation starts
             messages = [
                 {
                     "role": "user",
-                    "content": "What plan is customer cust_002 on, and are they in good standing?",
+                    "content": question,
                 }
             ]
 
@@ -99,7 +111,19 @@ async def main():
                 print(f"\nFinal answer:\n{final_response.content[0].text}")
             else:
                 print(f"\nFinal answer:\n{response.content[0].text}")
+    
+    
 
-
+# Use an async function when communicating with servers
+async def main():
+    question = "What plan is customer cust_002 on, and are they in good standing?"
+ 
+    # Case 1: "employee" is allowed to call get_customer per server.py's ALLOWED_TOOLS. Expect a real answer.
+    await run_as("employee", question)
+ 
+    # Case 2: "guest" has an empty allowed-tools list. Expect the server's gateway to deny the call before FAKE_CUSTOMER_DATABASE is ever touched
+    # Claude should receive a denial message and respond by explaining it couldn't retrieve the information.
+    await run_as("guest", question)
+    
 if __name__ == "__main__":
     anyio.run(main)
