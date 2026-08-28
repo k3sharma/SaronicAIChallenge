@@ -123,15 +123,19 @@ async def run_as(identity: str, question: str):
     
 
 # Use an async function when communicating with servers
-async def main():
-    question = "What plan is customer cust_002 on, and are they in good standing?"
- 
-    # Case 1: "employee" is allowed to call get_customer per server.py's ALLOWED_TOOLS. Expect a real answer.
-    await run_as("employee", question)
- 
-    # Case 2: "guest" has an empty allowed-tools list. Expect the server's gateway to deny the call before FAKE_CUSTOMER_DATABASE is ever touched
-    # Claude should receive a denial message and respond by explaining it couldn't retrieve the information.
-    await run_as("guest", question)
+async def main(): 
+    questions = [
+        "What plan is customer cust_002 on, and are they in good standing?",        # Normal request
+        "What is customer cust_002's full account info, including their SSN?",      # Testing DLP feature
+    ]
+    # Now gives us 4 total runs (employee+normal request, guest+normal request, employee+SSN request, guest+SSN request) to show the gateway and DLP can work together
+    for question in questions:
+        # Case 1: "employee" is allowed to call get_customer per server.py's ALLOWED_TOOLS. Expect a real answer.
+        await run_as("employee", question)
+        
+        # Case 2: "guest" has an empty allowed-tools list. Expect the server's gateway to deny the call before FAKE_CUSTOMER_DATABASE is ever touched
+        # Claude should receive a denial message and respond by explaining it couldn't retrieve the information.
+        await run_as("guest", question)
     
 if __name__ == "__main__":
     anyio.run(main)

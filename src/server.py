@@ -9,6 +9,7 @@ import os
 import sys
 from mcp.server.fastmcp import FastMCP      # FastMCP is a framework used for building MCP applications
 import audit_log
+import dlp
 
 mcp = FastMCP("SaronicChallengeGateway")    # Instantiate an MCP server called SaronicChallengeGateway
 
@@ -16,8 +17,8 @@ audit_log.init_db()         # Initialize the log table at the start
 
 # Example database with key value pairs
 FAKE_CUSTOMER_DATABASE = {
-    "cust_001": {"name": "Alice Chen", "plan": "Enterprise", "status": "active"},
-    "cust_002": {"name": "Marcus Webb", "plan": "Starter", "status": "past_due"},
+    "cust_001": {"name": "Alice Chen", "plan": "Enterprise", "status": "active", "ssn": "123-45-6789"},
+    "cust_002": {"name": "Marcus Webb", "plan": "Starter", "status": "past_due", "ssn": "987-65-4321"},
 }
 
 CURRENT_IDENTITY = os.environ.get("AGENT_IDENTITY", "guest")    # Default to the least-privileged role as the identity
@@ -68,9 +69,21 @@ def get_customer(customer_id: str) -> dict:
             )
         }
     
-    if customer_id in FAKE_CUSTOMER_DATABASE:
-        return FAKE_CUSTOMER_DATABASE[customer_id]
-    return {"error": f"No customer found with id '{customer_id}'"}
+    if customer_id not in FAKE_CUSTOMER_DATABASE:
+        return {"error": f"No customer found with id '{customer_id}'"}
+    
+    raw_result = FAKE_CUSTOMER_DATABASE[customer_id]
+ 
+    # raw_result has the real SSN so use redact_sensitive_data to redact it
+    # The real SSN doesn't leave the function
+    redacted_result = dlp.redact_sensitive_data(raw_result)
+ 
+    # Log whether DLP actually got activated on this call
+    # Tells us "how often does this tool touch sensitive fields" 
+    if dlp.contains_sensitive_data(raw_result):
+        print(f"[DLP] Redacted sensitive data in response for '{customer_id}'", file=sys.stderr)
+ 
+    return redacted_result
 
 # Start the server, listen to the client
 if __name__ == "__main__":
