@@ -17,8 +17,8 @@ audit_log.init_db()         # Initialize the log table at the start
 
 # Example database with key value pairs
 FAKE_CUSTOMER_DATABASE = {
-    "cust_001": {"name": "Alice Chen", "plan": "Enterprise", "status": "active", "ssn": "123-45-6789"},
-    "cust_002": {"name": "Marcus Webb", "plan": "Starter", "status": "past_due", "ssn": "987-65-4321"},
+    "cust_001": {"name": "Alice Chen", "plan": "Enterprise", "status": "active", "ssn": "123-45-6789", "email": "alice.chen@example.com", "internal_notes": "API key on file: sk-ant-fakeKeyForTesting1234567890"},
+    "cust_002": {"name": "Marcus Webb", "plan": "Starter", "status": "past_due", "ssn": "987-65-4321", "email": "marcus.webb@example.com"},
 }
 
 CURRENT_IDENTITY = os.environ.get("AGENT_IDENTITY", "guest")    # Default to the least-privileged role as the identity
@@ -78,10 +78,10 @@ def get_customer(customer_id: str) -> dict:
     # The real SSN doesn't leave the function
     redacted_result = dlp.redact_sensitive_data(raw_result)
  
-    # Log whether DLP actually got activated on this call
-    # Tells us "how often does this tool touch sensitive fields" 
-    if dlp.contains_sensitive_data(raw_result):
-        print(f"[DLP] Redacted sensitive data in response for '{customer_id}'", file=sys.stderr)
+    # Now, log which categories were activated (SSN, email, etc.)
+    categories = dlp.find_sensitive_categories(raw_result)
+    if categories:
+        print(f"[DLP] Redacted {sorted(categories)} in response for '{customer_id}'", file=sys.stderr)
  
     return redacted_result
 

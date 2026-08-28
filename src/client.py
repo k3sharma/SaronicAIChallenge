@@ -125,7 +125,7 @@ async def run_as(identity: str, question: str):
 # Use an async function when communicating with servers
 async def main(): 
     questions = [
-        "What plan is customer cust_002 on, and are they in good standing?",        # Normal request
+        "What plan is customer cust_001 on, and are they in good standing?",        # Normal request
         "What is customer cust_002's full account info, including their SSN?",      # Testing DLP feature
     ]
     # Now gives us 4 total runs (employee+normal request, guest+normal request, employee+SSN request, guest+SSN request) to show the gateway and DLP can work together
