@@ -49,9 +49,8 @@ def log_access_attempt(identity: str, tool_name: str, tool_args: dict, allowed: 
 
 # Use a decorator so that FastMCP registers it as a tool, thus, clients can discover get_customer and call it
 @mcp.tool()
-def get_customer(customer_id: str) -> dict:
-    # Look up a customer's account information (name, plan tier, and account status) using their unique customer ID
-    
+# Look up a customer's account information (name, plan tier, and account status) using their unique customer ID
+def get_customer(customer_id: str) -> dict:   
     allowed = is_allowed(CURRENT_IDENTITY, "get_customer")      # This is where the gateway check occurs
     log_access_attempt(
             CURRENT_IDENTITY,

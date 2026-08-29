@@ -5,14 +5,6 @@ and redacts them before that output goes back to Claude, into the audit log, or 
 # Use regex for pattern-matching
 import re
 
-# Now, we have 4 patterns instead of just the SSN
-SENSITIVE_PATTERNS = {
-    "ssn": re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
-    "credit_card": re.compile(r"\b(?:\d[ -]*?){13,16}\b"),
-    "email": re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b"),
-    "phone": re.compile(r"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b"),
-}
-
 # Now, we have 5 patterns instead of just the SSN
 # Interesting trade off occurs: 
 # Broadening the SSN pattern to accept dots, spaces, or no separator at all catches more real SSNs, but it also makes the pattern more likely to false-positive on things that look like an SSN

@@ -43,6 +43,7 @@ def extract_text(content_blocks) -> str:
 async def run_as(identity: str, question: str):
     print(f"\n{'=' * 70}")
     print(f"Connecting as identity: '{identity}'")
+    print(f"Question: {question}")      # Ask a question
     print('=' * 70)
  
     # Copy the current environment because we do not want to replace the entire environment throughout the process
@@ -115,11 +116,15 @@ async def run_as(identity: str, question: str):
                     tools=claude_tools,
                     messages=messages,
                 )
-                # Print
-                print(f"\nFinal answer:\n{extract_text(final_response.content)}")
+                # The return value is what lets eval_suite.py call this exact same function for its adversarial test cases, 
+                # instead of duplicating this whole MCP connection loop in a second file
+                final_text = extract_text(final_response.content)
+                print(f"\nFinal answer:\n{final_text}")
+                return final_text
             else:
-                print(f"\nFinal answer:\n{extract_text(response.content)}")
-    
+                final_text = extract_text(response.content)
+                print(f"\nFinal answer:\n{final_text}")
+                return final_text
     
 
 # Use an async function when communicating with servers
