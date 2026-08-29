@@ -62,14 +62,27 @@ TEST_CASES = [
 # Runs one test case through the real agent loop, then checks the outcome against the audit log's recorded verdict, 
 # and a DLP scan of the final answer text
 async def run_eval(case: dict) -> dict:
+    # Previously, if no new row was written for a test case, it would find a stale row from an earlier test even though 
+    # nothing about the current specific test case was verified. Thus, the eval had accidentally passed for the wrong reason
+    # Now, record the audit log's row count before running the case and only accept a verdict if a new row appeared afterward. 
+    # Getting the most recent row for an identity is unsafe
+    rows_before = audit_log.fetch_recent(limit=50)
+    count_before = len(rows_before)
+    
     final_text = await run_as(case["identity"], case["question"])
 
-    # Check #1: what did the gateway actually decide? 
-    recent_rows = audit_log.fetch_recent(limit=5)
-    matching_row = next(
-        (row for row in recent_rows if row[1] == case["identity"]), None
-    )
-    actual_verdict = matching_row[4] if matching_row else "NO_LOG_ENTRY_FOUND"
+    rows_after = audit_log.fetch_recent(limit=50)
+    
+    # Check #1: Only trust the verdict if a new row appears
+    if len(rows_after) > count_before:
+        # A new row appeared 
+        actual_verdict = rows_after[0][4]
+    else:
+        # No new row was written at all. The tool was never called
+        # (e.g. Claude declined on its own, or was denied before reaching the tool). 
+        # This is a distinct, legitimate outcome and must be reported as such rather than silently matched against old data
+        actual_verdict = "NO_TOOL_CALL_MADE"
+ 
     verdict_passed = actual_verdict == case["expect_verdict"]
 
     # Check #2 (only for cases that ask for it): does the final answer
