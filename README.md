@@ -1,5 +1,5 @@
 # Overview
-Large language models become significantly more useful when they can interact with external systems through tools. However, granting an AI agent access to internal systems introduces the security challenge that users may attempt to access tools or data they are not authorized to use, through certain adversarial techniques. This is a secure MCP (Model Context Protocol) server exposing tools to Claude and it demonstrates how AI agents can safely interact with enterprise systems through server-side authorization and policy enforcement. This treats the MCP server as a boundary and ensures that any AI client connecting to it is subject to the same control.
+Large language models become significantly more useful when they can interact with external systems through tools. However, granting an AI agent access to internal systems introduces the security challenge that users may attempt to access tools or data they are not authorized to use, through certain adversarial techniques. This project is a secure MCP (Model Context Protocol) server exposing tools to Claude and it demonstrates how AI agents can safely interact with enterprise systems through server-side authorization and policy enforcement. This treats the MCP server as a boundary and ensures that any AI client connecting to it is subject to the same control.
 
 I chose this project because it combines three areas that interest me: software engineering, security, and AI systems. My goal was to demonstrate how authorization and security controls can be integrated directly into the infrastructure that serves AI agents.
 
@@ -7,7 +7,7 @@ The main question this project answers is: "Which agent is allowed to call which
 
 # Architecture
 ### Files
-**server.py:** The MCP server. Defines the _get_customer_ tool, reads an _AGENT_IDENTITY_ from its environment at startup, and enforces the permission check inside the tool, before any data is touched.
+**server.py:** The MCP server. Defines the _get_customer_ tool, reads an _AGENT_IDENTITY_ (identity that the MCP server uses to decide what permissions the connected client has) from its environment at startup, and enforces the permission check inside the tool, before any data is touched.
 
 **client.py:** Spawns a fresh server subprocess per identity, discovers its tools over MCP, and runs the standard tool-use loop against the Claude API (claude-sonnet-5).
 
@@ -27,7 +27,7 @@ The main question this project answers is: "Which agent is allowed to call which
 Claude is the reasoning layer that decides when to call the _get_customer_ tool and how to phrase the final answer to the user. It has no influence over whether that call is permitted or what data gets redacted since those decisions happen in Python, in code paths that never read the conversation.
 
 # Sample Output
-<ins>eval_suite.py:</ins>
+_eval_suite.py:_
 
 The `eval_suite.py` file runs 4 scenarios: a normal denied request, a normal allowed request, and 2 adversarial attempts that use prompt-injection-style language to try and talk the model into ignoring the rules. Each result is checked against the audit log's actual recorded verdict (not Claude's wording at all). Thus, a "PASS" means the gateway made a correct allow/deny decision despite how the request was phrased. Here is the sample output when running the file (`python src/eval_suite.py`):
 ```
@@ -137,7 +137,7 @@ Verdict: expected=ALLOWED actual=ALLOWED
 
 4/4 tests passed
 ```
-<ins>view_logs.py:</ins>
+_view_logs.py:_
 
 In the `view_logs.py` file, every row is a tool-call attempt which is recorded automatically by the gateway when its made a decision. Each `guest` denied before any customer data is touched, and each `employee` was allowed with DLP being activated on the sensitive fields. This is a sample output/record when running the file (`python src/view_logs.py`):
 ```
@@ -179,14 +179,14 @@ Claude was used throughout as an active collaborator on architecture and debuggi
 - Explaining unfamiliar concepts
 - Generating boilerplates and scaffolding
 - Suggesting approaches to implementation
-- Producing documentation and code comments
+- Drafting documentation and code comments
 
 <ins>I used my own judgement when:</ins>
 
 - Selecting the project scope
 - Choosing MCP as a foundation
 - Determining tradeoffs
-- Reviewing/modifying code before committing
+- Reviewing/modifying code and refactoring documentation/comments before committing
 
 ## How I Handled Claude's Limitations
 - Validated generated code through execution and testing
@@ -215,7 +215,7 @@ After building the MCP server with a _ALLOWED_TOOLS_ gateway (employee: allowed,
 
 My initial debugging prompt to Claude included the MCP client/server code, the missing gateway log output, and the fact that both identities appeared to receive the same answer. Claude suggested several possible causes, including the possibility that the permission check was never executing and the possibility that MCP's stdio transport was interfering with logging visibility. The latter turned out to be the key insight. Claude explained that MCP communicates over stdout and recommended routing diagnostic output to stderr instead. That immediately restored visibility into the server's execution path and allowed me to verify that the authorization logic was actually firing.
 
-Despite Claude generating multiple explanations, there was not a definitive answer. I still had to verify them experimentally by changing the logging destination and observing the resulting behavior. The value was not that Claude magically found the bug; it helped narrow the search space and gave me a debugging consideration I likely would not have investigated immediately.
+Despite Claude generating multiple explanations, there was not a definitive answer. I still had to verify them experimentally by changing the logging destination and observing the resulting behavior. The value here was that it helped narrow the search space and gave me a debugging consideration I likely would not have investigated immediately.
 
 <ins>Example #3: A defensive parsing bug from an unexpected response shape</ins>
 
